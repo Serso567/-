@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Сад Знаний</title>
+<style>
+  :root{
+    --pad: clamp(12px, 3vw, 28px);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    height:100%;
+    display:flex; flex-direction:column;
+    overscroll-behavior:none;
+    background:#cfe9ff; color:#2b2b2b;
+    transition: background 1.2s ease;
+  }
+
+  /* ---------- SCREENS ---------- */
+  .screen{ display:none; height:100%; flex-direction:column; }
+  .screen.active{ display:flex; }
+
+  /* ---------- MENU ---------- */
+  #menu{
+    align-items:center; justify-content:center;
+    background:linear-gradient(160deg,#ffe3b3 0%, #ffd6a5 40%, #ffb78f 100%);
+    color:#4a2c1a;
+    text-align:center;
+  }
+  .card{
+    background:rgba(255,255,255,.75);
+    backdrop-filter: blur(4px);
+    border-radius:22px;
+    padding:var(--pad);
+    max-width:480px; width:92%;
+    box-shadow:0 12px 30px rgba(0,0,0,.12);
+  }
+  h1{ font-size:clamp(32px,7vw,52px); margin:.1em 0 .1em; letter-spacing:1px; }
+  .tagline{ margin:0 0 1.2em; font-size:clamp(15px,4vw,18px); opacity:.85; }
+  .group{ text-align:left; margin:14px 0; }
+  .group .label{ font-weight:700; font-size:14px; opacity:.8; margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px; }
+  .opts{ display:flex; gap:8px; flex-wrap:wrap; }
+  .opt{
+    flex:1 1 120px;
+    background:#fff; border:2px solid rgba(0,0,0,.08);
+    border-radius:14px; padding:12px 10px; cursor:pointer;
+    text-align:center; font-size:15px; font-weight:600;
+    transition: all .15s;
+  }
+  .opt.selected{ border-color:#e8642c; background:#ffe1c9; }
+  .opt small{ display:block; font-weight:400; opacity:.7; margin-top:3px; font-size:12px; }
+  .btn{
+    margin-top:18px; width:100%;
+    background:linear-gradient(135deg,#e8642c,#ff8c42);
+    color:#fff; border:none; border-radius:16px;
+    padding:16px; font-size:20px; font-weight:800; letter-spacing:.5px;
+    cursor:pointer; box-shadow:0 6px 0 #b84a1c;
+    transition: transform .1s, box-shadow .1s;
+  }
+  .btn:active{ transform:translateY(4px); box-shadow:0 2px 0 #b84a1c; }
+
+  /* ---------- GAME ---------- */
+  #game{ }
+  #sky{
+    flex:1 1 auto;
+    position:relative;
+    min-height:0;
+    transition: background 1.2s ease;
+    background:linear-gradient(180deg,#ffc9a6,#ffe3b3);
+    overflow:hidden;
+  }
+  .star{ position:absolute; color:#fff; font-size:14px; opacity:0; transition: opacity 1.5s; text-shadow:0 0 6px #fff; }
+  .star.on{ opacity:.9; }
+
+  #sun{
+    position:absolute;
+    font-size:54px;
+    transform:translate(-50%,-50%);
+    filter:drop-shadow(0 0 18px rgba(255,200,80,.9));
+    transition: left .8s ease, top .8s ease;
+  }
+  #timelabel{
+    position:absolute; top:12px; left:0; right:0; text-align:center;
+    font-size:clamp(18px,5vw,26px); font-weight:800; color:#4a2c1a;
+    text-shadow:0 1px 0 rgba(255,255,255,.4);
+  }
+  #score{
+    position:absolute; top:12px; right:14px;
+    background:rgba(255,255,255,.7); border-radius:20px; padding:6px 14px;
+    font-weight:800; font-size:15px;
+  }
+  #soundbtn{
+    position:absolute; top:12px; left:14px;
+    width:38px; height:38px; border:none; border-radius:50%;
+    background:rgba(255,255,255,.7); font-size:19px; cursor:pointer;
+  }
+
+  #ground{
+    flex:0 0 clamp(180px, 30vh, 230px);
+    background:linear-gradient(180deg,#b7dd86 0%, #6ba64a 45%, #4e8a38 100%);
+    border-top: 10px solid #4e8a38;
+    padding: var(--pad) var(--pad);
+    position:relative;
+    overflow:hidden;
+  }
+  #garden{
+    display:flex;
+    justify-content:space-around;
+    align-items:flex-end;
+    height:100%; width:100%;
+  }
+  .plant{
+    display:flex; flex-direction:column; justify-content:flex-end; align-items:center;
+    height:100%; min-width:0;
+  }
+  /* цветок — обычный блок, стоит прямо над стеблем (без зазора) */
+  .flower{ font-size:clamp(56px,14vw,104px); line-height:1; opacity:0; max-height:clamp(56px,14vw,104px); transition:opacity .4s; }
+  .flower.on{ opacity:1; }
+  .plant.bloom .flower{ animation:bob 2.6s ease-in-out infinite; }
+  /* стебель растёт из земли вверх */
+  .stem{
+    position:relative;
+    background:linear-gradient(90deg,#3e7d2c,#6fbf4a);
+    width:clamp(8px,2vw,12px);
+    height:0px;
+    transition:height .5s ease;
+  }
+  /* листья — смотрят от стебля, но стоят вплотную к нему */
+  .leaf{
+    position:absolute; top:-4px;
+    font-size:clamp(30px,8vw,52px); line-height:1;
+    opacity:0; transition:opacity .4s;
+  }
+  .leaf.l{ right:calc(50% + 2px); transform:scaleX(-1); }
+  .leaf.r{ left:calc(50% + 2px); }
+  .leaf.on{ opacity:1; }
+  .soil{
+    width:clamp(26px,6vw,44px); height:clamp(8px,1.8vw,13px);
+    background:radial-gradient(circle, #8a5a2b 40%, #6d4420 100%);
+    border-radius:50%; margin:0 auto 4px;
+    border-top:3px solid #5a3719;
+  }
+  .plant.bloom .flower{ animation:bob 2.6s ease-in-out infinite; }
+  @keyframes bob{ 0%,100%{transform:rotate(-3deg);} 50%{transform:rotate(3deg);} }
+
+  /* ---------- QUIZ ---------- */
+  #quiz{
+    background:#fff;
+    border-radius:18px 18px 0 0;
+    padding:var(--pad) var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));
+    box-shadow:0 -8px 24px rgba(0,0,0,.08);
+  }
+  #qtext{ font-size:clamp(18px,4.5vw,23px); font-weight:700; margin:0 0 14px; }
+  #answers{ display:flex; flex-direction:column; gap:10px; }
+  .ans{
+    background:#f6f6f6; border:2px solid rgba(0,0,0,.06);
+    border-radius:14px; padding:14px; font-size:clamp(16px,4vw,19px);
+    text-align:left; cursor:pointer; transition: all .15s;
+  }
+  .ans:active{ transform:scale(.99); }
+  .ans.correct{ background:#c8e6c9; border-color:#43a047; }
+  .ans.wrong{ background:#ffcdd2; border-color:#e53935; }
+  .ans.ghost{ opacity:.55; }
+  #feedback{
+    margin-top:12px; min-height:22px; font-weight:600; text-align:center;
+    font-size:15px; color:#666;
+  }
+  #progresswrap{
+    margin-bottom:14px;
+  }
+  #progressbar{
+    height:12px; background:#eee; border-radius:8px; overflow:hidden;
+  }
+  #progressfill{
+    height:100%; width:0%;
+    background:linear-gradient(90deg,#ffca28,#ff8c42);
+    border-radius:8px; transition: width .5s ease;
+  }
+
+  /* ---------- END ---------- */
+  #end{
+    align-items:center; justify-content:center; text-align:center;
+    background:linear-gradient(180deg,#ff9a4d,#e8642c);
+    color:#fff; padding:var(--pad);
+  }
+  #end .card2{ max-width:460px; width:100%; }
+  .big-emoji{ font-size:64px; }
+  #end h2{ font-size:clamp(26px,7vw,40px); margin:.5em 0 .2em; }
+  #end p{ font-size:17px; line-height:1.5; opacity:.95; }
+  #newbtn{ margin-top:22px; max-width:300px; margin-left:auto; margin-right:auto; background:linear-gradient(135deg,#fff,#ffe9d6); color:#7a3a12; box-shadow:0 6px 0 #d9a15b; }
+
+  @keyframes bob{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
+  #sun.moon{ filter:drop-shadow(0 0 14px rgba(220,220,255,.8)); }
+</style>
+</head>
+<body>
+
+<!-- ================== МЕНЮ ================== -->
+<div id="menu" class="screen active">
+  <div class="card">
+    <h1>🌻 Сад Знаний</h1>
+    <p class="tagline">Отвечай на вопросы — и пусть солнце ведёт твой сад через весь день, от рассвета до заката.</p>
+
+    <div class="group">
+      <div class="label">Для кого играем?</div>
+      <div class="opts" id="levelOpts">
+        <div class="opt selected" data-val="kids">🧒 Детский<small>просто и весело</small></div>
+        <div class="opt" data-val="mature">👴 Взрослый<small>чуть посложнее</small></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="label">Длина дня</div>
+      <div class="opts" id="lenOpts">
+        <div class="opt selected" data-val="short">☀️ Короткий<small>10 ответов</small></div>
+        <div class="opt" data-val="long">🌞 Длинный<small>30 ответов</small></div>
+      </div>
+    </div>
+
+    <button class="btn" id="startBtn">Начать день 🌷</button>
+  </div>
+</div>
+
+<!-- ================== ИГРА ================== -->
+<div id="game" class="screen">
+  <div id="sky">
+    <div id="timelabel">Утро</div>
+    <button id="soundbtn" title="Звук">🔊</button>
+    <div id="score">0 / 0</div>
+    <div id="sun">☀️</div>
+  </div>
+  <div id="ground">
+    <div id="garden" class="fadein"></div>
+  </div>
+  <div id="quiz">
+    <div id="progresswrap">
+      <div id="progressbar"><div id="progressfill"></div></div>
+    </div>
+    <p id="qtext"></p>
+    <div id="answers"></div>
+    <div id="feedback"></div>
+  </div>
+</div>
+
+<!-- ================== КОНЕЦ ================== -->
+<div id="end" class="screen">
+  <div class="card2">
+    <div class="big-emoji">🌅</div>
+    <h2 id="endTitle">Сад расцвёл!</h2>
+    <p id="endText"></p>
+    <button class="btn" id="newbtn">Играть ещё раз 🌱</button>
+  </div>
+</div>
+
+<script>
+/* ==================================================
+   БАЗА ВОПРОСОВ
+================================================== */
+const BANK = {
+  kids: [
+    {q:"Какого цвета небо в солнечный день?", a:["Голубое","Зелёное","Красное","Фиолетовое"], c:0},
+    {q:"Сколько будет 3 + 4?", a:["6","7","8","5"], c:1},
+    {q:"Какое животное даёт нам молоко?", a:["Кошка","Корова","Собака","Попугай"], c:1},
+    {q:"Что из этого растёт на дереве?", a:["Яблоко","Картошка","Морковка","Огурец"], c:0},
+    {q:"Какой предмет используется, чтобы писать?", a:["Ножницы","Карандаш","Тарелка","Подушка"], c:1},
+    {q:"Кто из них летает?", a:["Кошка","Рыба","Птица","Лошадь"], c:2},
+    {q:"Какого цвета трава летом?", a:["Зелёная","Синяя","Розовая","Оранжевая"], c:0},
+    {q:"В какое время суток светит луна?", a:["Утром","Днём","Ночью","В обед"], c:2},
+    {q:"Что мы надеваем на руки зимой?", a:["Шапку","Варежки","Ботинки","Шарф"], c:1},
+    {q:"Сколько ножек у стула?", a:["2","3","4","6"], c:2},
+    {q:"Какой звук издает корова?", a:["Мяу","Гав","Му","Ку-ка-ре-ку"], c:2},
+    {q:"Что нужно растению, чтобы расти?", a:["Вода и свет","Камень","Песок","Тень"], c:0},
+    {q:"В какое время года идёт снег?", a:["Летом","Зимой","Весной","Осенью"], c:1},
+    {q:"Что мы ставим в вазу?", a:["Цветы","Хлеб","Гайки","Книги"], c:0},
+    {q:"Сколько дней в неделе?", a:["5","6","7","8"], c:2},
+    {q:"Кто лечит людей, когда они болеют?", a:["Учитель","Врач","Повар","Строитель"], c:1},
+    {q:"Сколько пальцев на одной руке?", a:["3","4","5","6"], c:2},
+    {q:"Какое время года наступает после зимы?", a:["Лето","Весна","Осень","Зима"], c:1},
+    {q:"Что из этого летает в небе?", a:["Самолёт","Автобус","Поезд","Корабль"], c:0},
+    {q:"В какой сказке старик поймал золотую рыбку?", a:["Курочка Ряба","Репка","О рыбаке и рыбке","Теремок"], c:2},
+    {q:"Что мы слышим ушами?", a:["Звук","Запах","Вкус","Цвет"], c:0},
+    {q:"Кто из этих животных живёт в воде?", a:["Кошка","Рыба","Заяц","Корова"], c:1},
+    {q:"Сколько ног у паука?", a:["6","8","4","10"], c:1},
+    {q:"Что мы едим ложкой?", a:["Суп","Хлеб","Яблоко","Сыр"], c:0},
+    {q:"Какой цвет у огурца?", a:["Красный","Жёлтый","Зелёный","Синий"], c:2},
+    {q:"Когда мы просыпаемся?", a:["Ночью","Утром","Вечером","В полночь"], c:1},
+    {q:"Сколько ушей у двух зайцев?", a:["2","3","4","6"], c:2},
+    {q:"Что горит в костре?", a:["Вода","Дрова","Камень","Песок"], c:1},
+    {q:"Какое животное мяукает?", a:["Собака","Кошка","Корова","Лошадь"], c:1},
+    {q:"Как называется детёныш лошади?", a:["Щенок","Котёнок","Жеребёнок","Ягнёнок"], c:2},
+    {q:"Что светит днём на небе?", a:["Луна","Солнце","Звезда","Облако"], c:1},
+    {q:"Из чего пекут хлеб?", a:["Из муки","Из картошки","Из сахара","Из соли"], c:0},
+    {q:"Кто охраняет дом?", a:["Кошка","Собака","Хомяк","Попугай"], c:1},
+    {q:"Что мы надеваем на голову?", a:["Шапка","Шарф","Варежки","Носки"], c:0},
+    {q:"Какой фрукт жёлтый и кислый?", a:["Яблоко","Лимон","Арбуз","Банан"], c:1},
+    {q:"Сколько носиков у двух чайников?", a:["1","2","3","4"], c:1},
+    {q:"Кто живёт в улье?", a:["Пчёлы","Мыши","Рыбы","Птицы"], c:0},
+    {q:"Что мы видим на ночном небе?", a:["Солнце","Звёзды","Радугу","Тучу"], c:1},
+    {q:"Какое животное даёт шерсть для носков?", a:["Кошка","Овца","Собака","Петух"], c:1},
+    {q:"Что бывает после дождя в небе?", a:["Радуга","Снег","Солнце","Луна"], c:0},
+    {q:"Что кладут в суп первым?", a:["Воду","Хлеб","Пирог","Конфету"], c:0},
+    {q:"Сколько крылышек у бабочки?", a:["1","2","4","6"], c:2},
+    {q:"Какое время года самое жаркое?", a:["Зима","Лето","Осень","Весна"], c:1},
+    {q:"Что помогает нам видеть?", a:["Уши","Глаза","Нос","Руки"], c:1},
+    {q:"Какой зверь спит зимой в берлоге?", a:["Волк","Заяц","Медведь","Лиса"], c:2},
+    {q:"Что мы пьём на завтрак?", a:["Молоко","Клей","Сок","Суп"], c:0},
+    {q:"Сколько лап у двух собак?", a:["4","6","8","10"], c:2},
+    {q:"Какая ягода красная и растёт в лесу?", a:["Апельсин","Малина","Банан","Груша"], c:1},
+    {q:"Что растёт в огороде?", a:["Морковка","Подушка","Гайка","Телефон"], c:0},
+    {q:"Кто из них умеет плавать?", a:["Кошка","Рыба","Птица","Бабочка"], c:1},
+    {q:"Что мы чистим зубами?", a:["Щёткой","Расчёской","Ложкой","Губкой"], c:0},
+    {q:"Какой месяц первый в году?", a:["Январь","Март","Июнь","Декабрь"], c:0},
+    {q:"Что светит нам от лампочки?", a:["Свет","Ветер","Звук","Запах"], c:0},
+    {q:"Сколько хвостов у трёх кошек?", a:["1","2","3","4"], c:2},
+    {q:"Какое животное быстро бегает?", a:["Черепаха","Лошадь","Улитка","Слон"], c:1},
+    {q:"Что носят на ногах?", a:["Перчатки","Ботинки","Платок","Очки"], c:1},
+    {q:"Кто читает книги и учит детей?", a:["Повар","Учитель","Водитель","Врач"], c:1},
+    {q:"Что капает из крана?", a:["Вода","Сок","Молоко","Чай"], c:0},
+    {q:"Какой цветок жёлтый и похож на солнце?", a:["Роза","Подсолнух","Тюльпан","Кактус"], c:1},
+    {q:"Сколько лучей у солнца на картинке (обычно)?", a:["4","6","8","12"], c:2},
+    {q:"Что защищает нас от дождя?", a:["Зонт","Очки","Шапка","Перчатки"], c:0},
+    {q:"Какое животное умеет лазить по деревьям?", a:["Обезьяна","Слон","Жираф","Носорог"], c:0},
+  ],
+  mature: [
+    {q:"Сколько месяцев в году?", a:["10","12","11","13"], c:1},
+    {q:"Кто написал сказку «Колобок»? Это…", a:["Пушкин","Народная сказка","Толстой","Чехов"], c:1},
+    {q:"Какой газ мы вдыхаем, чтобы жить?", a:["Углекислый","Кислород","Водород","Азот"], c:1},
+    {q:"Продолжите пословицу: «Семь раз отмерь…»", a:["…один отрежь","…два отрежь","…никогда не ошибайся","…лишнего не бери"], c:0},
+    {q:"Что из этого является металлом?", a:["Дерево","Стекло","Железо","Пластик"], c:2},
+    {q:"Какой орган отвечает за мышление? Это …", a:["Сердце","Лёгкие","Мозг","Печень"], c:2},
+    {q:"Кто написал «Войну и мир»?", a:["Достоевский","Толстой","Гоголь","Пушкин"], c:1},
+    {q:"Сколько килограммов в одном центнере?", a:["10","50","100","1000"], c:2},
+    {q:"Что измеряют часами?", a:["Вес","Время","Длину","Температуру"], c:1},
+    {q:"Продолжите: «Не имей сто рублей, а имей…»", a:["…сто друзей","…тысячу рублей","…верную голову","…уверенность"], c:0},
+    {q:"Кто из этих относится к домашним птицам?", a:["Орёл","Сокол","Курица","Ворона"], c:2},
+    {q:"Какой океан самый большой?", a:["Атлантический","Тихий","Индийский","Северный Ледовитый"], c:1},
+    {q:"Как называется самая длинная кость у человека?", a:["Бедренная","Плечевая","Рёбра","Позвоночник"], c:0},
+    {q:"Что изучает ботаника?", a:["Камни","Растения","Звёзды","Животных"], c:1},
+    {q:"Какой прибор показывает направление?", a:["Термометр","Барометр","Компас","Секундомер"], c:2},
+    {q:"Продолжите: «Тише едешь — …»", a:["…дальше будешь","…быстрее приедешь","…больше устанешь","…меньше знаешь"], c:0},
+    {q:"Как называется столица России?", a:["Санкт-Петербург","Москва","Казань","Новосибирск"], c:1},
+    {q:"Сколько часов в одном дне?", a:["12","24","48","10"], c:1},
+    {q:"Какой прибор измеряет температуру?", a:["Барометр","Термометр","Весы","Линейка"], c:1},
+    {q:"Кто из них был космонавтом?", a:["Менделеев","Гагарин","Ломоносов","Циолковский"], c:1},
+    {q:"Как называется наука о звёздах?", a:["Ботаника","Астрономия","География","История"], c:1},
+    {q:"Что было раньше: телевизор или радио?", a:["Радио","Телевизор","Одновременно","Не помню"], c:2},
+    {q:"Продолжите: «В гостях хорошо, а …»", a:["…дома лучше","…в кафе лучше","…у друзей лучше","…в дороге лучше"], c:0},
+    {q:"Из какого металла делают провода?", a:["Золото","Медь","Чугун","Свинец"], c:1},
+    {q:"Как называется первый месяц зимы?", a:["Ноябрь","Декабрь","Январь","Февраль"], c:1},
+    {q:"Кто написал стихотворение «У лукоморья дуб зелёный»?", a:["Лермонтов","Пушкин","Есенин","Тютчев"], c:1},
+    {q:"Сколько копеек в одном рубле?", a:["50","100","10","1000"], c:1},
+    {q:"Какой океан омывает Россию с севера?", a:["Тихий","Северный Ледовитый","Атлантический","Индийский"], c:1},
+    {q:"Как называется прибор для разговора на расстоянии по проводам?", a:["Телеграф","Телефон","Радио","Компьютер"], c:1},
+    {q:"Что означает слово «спасибо»? Ответ: …", a:["Спаси Бог","Спаси меня","Благодарю","Спасибо всем"], c:0},
+    {q:"Как называется прибор, который показывает время?", a:["Весы","Часы","Барометр","Компас"], c:1},
+    {q:"Что из этого — не деревья?", a:["Дуб","Берёза","Ромашка","Сосна"], c:2},
+    {q:"Сколько минут в одном часе?", a:["30","60","100","12"], c:1},
+    {q:"Какой праздник отмечают по всей России 9 мая?", a:["Новый год","Пасху","День Победы","Масленицу"], c:2},
+    {q:"Как называется верхняя часть здания?", a:["Крыша","Фундамент","Лестница","Окно"], c:0},
+    {q:"Кто из них — инструмент музыканта?", a:["Молоток","Скрипка","Грабли","Топор"], c:1},
+    {q:"Продолжите: «Лучше синица в руках, чем …»", a:["…журавль в небе","…ворона в роще","…курица в печи","…сокол в горах"], c:0},
+    {q:"Какая планета называется «красной»?", a:["Венера","Марс","Юпитер","Меркурий"], c:1},
+    {q:"Что человек делает каждый день утром?", a:["Ложится спать","Просыпается","Ужинает","Заводит часы"], c:1},
+    {q:"Как называется место, где можно отдыхать и гулять среди деревьев?", a:["Огород","Парк","Гараж","Чердак"], c:1},
+    {q:"Какое животное из этих — самое крупное?", a:["Волк","Слон","Лиса","Медведь"], c:1},
+    {q:"Из чего делают стекло?", a:["Из песка","Из дерева","Из железа","Из бумаги"], c:0},
+    {q:"Продолжите: «Утро вечера …»", a:["…мудренее","…светлее","…белее","…холоднее"], c:0},
+    {q:"Сколько нот в октаве?", a:["5","7","8","12"], c:1},
+    {q:"Как называется прибор для измерения веса?", a:["Термометр","Весы","Линейка","Рулетка"], c:1},
+    {q:"Кто из этих — писатель?", a:["Пушкин","Чайковский","Репин","Пирогов"], c:0},
+    {q:"Что загорается, когда мы вставляем вилку в розетку? Это …", a:["Выключатель","Лампочка","Ключ","Штекер"], c:1},
+    {q:"Какое число идёт после девяти?", a:["8","9","10","11"], c:2},
+    {q:"Продолжите: «Волков бояться — …»", a:["…в лес не ходить","…в лес не соваться","…дома сидеть","…ужин варить"], c:0},
+    {q:"Как называется наука о числах?", a:["Биология","Математика","Физика","Химия"], c:1},
+    {q:"Что наступает раньше: осень или лето?", a:["Осень","Лето","Одновременно","Не бывает"], c:1},
+    {q:"Как называется дорога, по которой ходят пешком?", a:["Шоссе","Тропинка","Трасса","Магистраль"], c:1},
+    {q:"Кто из них работает на земле и растит урожай?", a:["Пекарь","Фермер","Продавец","Портной"], c:1},
+    {q:"Какой орган отвечает за зрение?", a:["Ухо","Нос","Глаз","Язык"], c:2},
+    {q:"Продолжите: «Яблоко от яблони …»", a:["…недалеко падает","…далеко катится","…никуда не движется","…вверх летит"], c:0},
+    {q:"Сколько букв в русском алфавите? (приблизительно)", a:["26","33","40","20"], c:1},
+    {q:"Что из этого — напиток?", a:["Компот","Суп","Каша","Блины"], c:0},
+    {q:"Какое время года начинается осенью?", a:["Весна","Зима","Лето","Осень"], c:0},
+    {q:"Что помогает растениям расти быстрее?", a:["Свет и вода","Камень","Темнота","Мороз"], c:0},
+  ],
+};
+
+/* ==================================================
+   СОСТОЯНИЕ
+================================================== */
+let state = {
+  level: "kids",
+  len: 10,
+  correct: 0,
+  total: 0,
+  needed: 10,
+  sound: true,
+  queue: [],
+  locked: false,
+};
+
+const PLANTS = ["🌷","🌸","🌻","🌼","🌹","🌺"];
+let gardenBuilt = false;
+function buildGarden(){
+  if(gardenBuilt) return;
+  gardenBuilt = true;
+  const g = $("garden");
+  PLANTS.forEach((f,i)=>{
+    const d = document.createElement("div");
+    d.className="plant";
+    d.innerHTML = `
+      <div class="flower">${f}</div>
+      <div class="stem">
+        <span class="leaf l">🌿</span>
+        <span class="leaf r">🌿</span>
+      </div>
+      <div class="soil"></div>`;
+    g.appendChild(d);
+  });
+}
+
+/* ==================================================
+   ЭЛЕМЕНТЫ
+================================================== */
+const $ = id => document.getElementById(id);
+const sky = $("sky"), sunEl = $("sun"), timeLabel = $("timelabel"),
+      scoreEl = $("score"), progFill = $("progressfill"),
+      qtext = $("qtext"), answersEl = $("answers"), feedback = $("feedback");
+window.__sky = sky;
+
+/* ==================================================
+   МЕНЮ
+================================================== */
+function bindOpts(selId, cb){
+  const wrap = $(selId);
+  wrap.addEventListener("click", e=>{
+    const opt = e.target.closest(".opt"); if(!opt) return;
+    wrap.querySelectorAll(".opt").forEach(o=>o.classList.remove("selected"));
+    opt.classList.add("selected");
+    cb(opt.dataset.val);
+  });
+}
+bindOpts("levelOpts", v=> state.level = v);
+bindOpts("lenOpts", v=> state.len = v==="short" ? 10 : 30);
+$("startBtn").addEventListener("click", startGame);
+$("soundbtn").addEventListener("click", e=>{
+  state.sound = !state.sound;
+  e.target.textContent = state.sound ? "🔊" : "🔇";
+  if(state.sound){ startMusic(); } else { stopMusic(); }
+});
+$("newbtn").addEventListener("click", ()=>{
+  stopMusic();
+  show($("menu")); showGame(false);
+});
+
+/* ==================================================
+   НАВИГАЦИЯ / ПЕРЕХОДЫ
+================================================== */
+function show(screen){ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active")); screen.classList.add("active"); }
+function showGame(on){
+  document.body.style.background = on ? "#cfe9ff" : "#cfe9ff";
+  if(on){ stars(); }
+}
+
+function shuffle(a){
+  const r=[...a];
+  // криптостойкое перемешивание — гарантированно разный порядок при каждом запуске
+  const arr = new Uint32Array(r.length);
+  if(window.crypto && crypto.getRandomValues){ crypto.getRandomValues(arr); }
+  else { for(let k=0;k<r.length;k++) arr[k]=Math.floor(Math.random()*0xFFFFFFFF); }
+  for(let i=r.length-1;i>0;i--){ const j=arr[i]%(i+1); [r[i],r[j]]=[r[j],r[i]]; }
+  return r;
+}
+
+function makeQueue(){ state.queue = shuffle(BANK[state.level]); }
+
+/* ==================================================
+   СТАРТ
+================================================== */
+function startGame(){
+  state.needed = state.len;
+  state.correct = 0;
+  state.total = 0;
+  state.locked = false;
+  makeQueue();
+  show($("game"));
+  showGame(true);
+  initAudio();
+  startMusic();
+  renderProgress();
+  nextQuestion();
+}
+
+/* ==================================================
+   ЗВУК (WebAudio, мягкий)
+================================================== */
+let actx = null;
+function initAudio(){ try{ actx = actx || new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+function tone(freq, dur, vol, type){
+  if(!state.sound || !actx) return;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type = type||"sine"; o.frequency.value=freq;
+  g.gain.setValueAtTime(0.0001, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(vol, actx.currentTime+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(); o.stop(actx.currentTime+dur);
+}
+function playGood(){ [523,659,784].forEach((f,i)=>setTimeout(()=>tone(f,.25,.12), i*90)); }
+function playBad(){ tone(200,.3,.10,"triangle"); }
+
+/* ---------- ФОНОВАЯ МУЗЫКА: инструментальный патриотический мотив ---------- */
+let musicTimer=null;
+let musicNodes=[];
+function note(f,t0,dur,vol,type){
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type||"sine"; o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0+0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t0); o.stop(t0+dur+0.1);
+  musicNodes.push({o,g});
+}
+// частота ноты по имени (октава 4)
+const N={
+  c:261.63, d:293.66, e:329.63, f:349.23, g:392.00, a:440.00,
+  C:523.25, D:587.33, E:659.25, F:698.46, G:783.99, A:880.00, H:987.77,
+};
+// мелодия: ['нота'|0=пауза, длительность в долях]; темп = задача на долю
+const MELODY=[
+  ["g",2],["e",1],["d",1],["c",2],["d",1],["e",1],
+  ["g",2],["g",1],["a",1],["g",2],["e",1],["c",1],
+  ["d",2],["e",1],["f",1],["e",2],["d",1],["c",1],
+  ["d",2],["e",1],["g",1],["C",3],["g",1],
+  ["C",2],["a",1],["g",1],["e",2],["d",1],["e",1],
+  ["f",2],["e",1],["d",1],["c",2],["d",1],["g",1],
+  ["g",2],["e",1],["d",1],["c",3],["g",1],
+  ["C",2],["g",1],["e",1],["d",2],["e",1],["f",1],
+  ["e",2],["d",1],["c",1],["d",3],["c",1],
+];
+const BASS=["c","f","g","c","f","g","c","g"];
+function playMelody(){
+  if(!state.sound || !actx) return;
+  const beat = 0.52;      // сек на долю
+  const now = actx.currentTime + 0.1;
+  let t = now;
+  // аккордовый "аккомпанемент" поверх мелодии
+  const barCount = Math.ceil(MELODY.length/6);
+  for(let b=0;b<barCount;b++){
+    note(N[BASS[b%BASS.length]], t+b*beat*6, 3.4, 0.07, "triangle");
+  }
+  // мелодия
+  MELODY.forEach((m,i)=>{
+    const st = m[1]*beat;
+    if(m[0]!==0){ note(N[m[0]], t, st*0.92, 0.10, "sine"); }
+    t += st;
+  });
+  // зацикливаем с мягким "дыханием"
+  const loopDur = (t - now) + 1.0;
+  musicTimer = setTimeout(playMelody, loopDur*1000);
+}
+function startMusic(){
+  if(!state.sound || !actx){ return; }
+  stopMusic();
+  playMelody();
+}
+function stopMusic(){ if(musicTimer){ clearTimeout(musicTimer); musicTimer=null; } musicNodes.forEach(n=>{ try{n.o.stop();}catch(e){} }); musicNodes=[]; }
+
+/* ==================================================
+   СОЛНЦЕ / НЕБО / ДЕНЬ
+================================================== */
+function dayInfo(t){
+  // t: 0..1 прогресс дня
+  if(t<0.22) return {label:"Утро",  moon:false};
+  if(t<0.55) return {label:"День",  moon:false};
+  if(t<0.82) return {label:"Вечер", moon:false};
+  return {label:"Закат", moon:false};
+}
+function sunPos(t){
+  // двигаем по дуге: слева-низ -> верх -> справа-низ
+  const w = sky.clientWidth, h = sky.clientHeight;
+  const x = 8 + t*84;                    // 8%..92%
+  const y = 74 - 52*Math.sin(Math.PI*t); // 74%..22%..74%
+  return {x, y};
+}
+const DAWN   = [255,196,150, 255,227,179 ];
+const NOON   = [160,210,255, 207,233,255 ];
+const DUSK   = [255,120,100, 255,170,110 ];
+function skyColor(t){
+  // плавная интерполяция между рассвет->день->закат
+  let a,b,f;
+  if(t<0.5){ a=DAWN; b=NOON; f=t/0.5; }
+  else     { a=NOON; b=DUSK; f=(t-0.5)/0.5; }
+  const c1 = a.map((v,i)=>Math.round(v+(b[i]-v)*f));
+  return `linear-gradient(180deg,rgb(${c1[0]},${c1[1]},${c1[2]}),rgb(${c1[3]},${c1[4]},${c1[5]}))`;
+}
+function drawSky(){
+  const t = state.needed ? state.correct/state.needed : 0;
+  const info = dayInfo(t);
+  timeLabel.textContent = info.label;
+  const p = sunPos(t);
+  sunEl.style.left = p.x+"%";
+  sunEl.style.top  = p.y+"%";
+  sky.style.background = skyColor(t);
+  stars();
+}
+function stars(){
+  let st = document.querySelectorAll(".star");
+  // появляются на закате
+  const t = state.needed ? state.correct/state.needed : 0;
+  st.forEach(s=> s.classList.toggle("on", t>0.7));
+}
+
+/* ==================================================
+   САД
+================================================== */
+function renderGarden(){
+  buildGarden();
+  const t = state.needed ? state.correct/state.needed : 0;
+  // 5 равномерных стадий: 0 земля, 1 росток, 2 стебель, 3 листья, 4 цветок
+  const stage = Math.min(4, Math.floor(t*5));
+  const within = t*5 - stage;      // 0..1 внутри стадии
+  // высота стебля привязана к фактической высоте поля (чуть короче, чтобы всё влезало)
+  const ground = document.querySelector('#ground');
+  const maxStem = Math.max(26, Math.floor(ground.clientHeight * 0.5));
+  const stemH = Math.round(t*maxStem);
+  const plants = document.querySelectorAll("#garden .plant");
+  plants.forEach((p)=>{
+    const flower = p.querySelector(".flower");
+    const leafL = p.querySelector(".leaf.l");
+    const leafR = p.querySelector(".leaf.r");
+    const stem = p.querySelector(".stem");
+    stem.style.height = Math.max(4, stemH)+"px";
+    leafL.classList.toggle("on", stage>=3);
+    leafR.classList.toggle("on", stage>=3);
+    flower.classList.toggle("on", stage>=4);
+    p.classList.toggle("bloom", stage>=4);
+    if(stage>=4){ flower.style.fontSize = `calc(24px + ${within*16}px)`; }
+    else { flower.style.fontSize = ""; }
+  });
+}
+
+/* ==================================================
+   ВИКТОРИНА
+================================================== */
+function renderProgress(){
+  scoreEl.textContent = `${state.correct} / ${state.needed}`;
+  const pct = state.needed ? (state.correct/state.needed)*100 : 0;
+  progFill.style.width = pct+"%";
+}
+
+function nextQuestion(){
+  if(state.correct >= state.needed){ finish(); return; }
+  if(state.queue.length===0) makeQueue();
+  const item = state.queue.pop();
+  renderQuestion(item);
+}
+
+function renderQuestion(item){
+  state.locked = false;
+  qtext.textContent = item.q;
+  answersEl.innerHTML = "";
+  const order = shuffle(item.a.map((txt,i)=>({txt, c: i===item.c})));
+  order.forEach((opt,i)=>{
+    const b = document.createElement("button");
+    b.className="ans";
+    b.textContent = opt.txt;
+    b.dataset.correct = opt.c ? "1":"0";
+    b.addEventListener("click", ()=>answer(b, item));
+    answersEl.appendChild(b);
+  });
+  feedback.textContent = "";
+}
+
+function answer(btn, item){
+  if(state.locked) return;
+  state.locked = true;
+  state.total++;
+  const isRight = btn.dataset.correct==="1";
+  const all = answersEl.querySelectorAll(".ans");
+  if(isRight){
+    btn.classList.add("correct");
+    state.correct++;
+    playGood();
+    feedback.textContent = "Верно! Сад растёт 🌱";
+  }else{
+    btn.classList.add("wrong");
+    all.forEach(b=>{ if(b.dataset.correct==="1") b.classList.add("correct"); else if(b!==btn) b.classList.add("ghost"); });
+    playBad();
+    feedback.textContent = "Не страшно. Правильный ответ подсвечен.";
+  }
+  renderProgress();
+  drawSky();
+  renderGarden();
+  setTimeout(nextQuestion, 1100);
+}
+
+/* ==================================================
+   ФИНИШ
+================================================== */
+function finish(){
+  document.querySelectorAll(".star").forEach(s=>s.classList.add("on"));
+  show($("end"));
+  const acc = Math.round((state.correct/state.total)*100);
+  $("endTitle").textContent = state.correct>=state.needed ? "Сад расцвёл!" : "Сад почти расцвёл!";
+  $("endText").innerHTML =
+    `Ты ответил(а) верно на <b>${state.correct}</b> вопросов.<br>`+
+    `Точность: <b>${isNaN(acc)?0:acc}%</b>.<br><br>`+
+    `Солнце прошло весь путь, и твой сад встретил закат. 🌻<br>`+
+    `Помни: как растение тянется к свету, так и знание растёт от вопросов.`;
+  for(let i=0;i<5;i++) tone(523+i*100,.3,.10);
+  playGood();
+}
+
+/* ==================================================
+   ИНИЦИАЛИЗАЦИЯ
+================================================== */
+function resize(){ drawSky(); }
+window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", ()=>setTimeout(resize, 300));
+// генерим звёзды один раз
+(function(){
+  for(let i=0;i<12;i++){
+    const s=document.createElement("span");
+    s.className="star";
+    s.textContent="✦";
+    s.style.left=(Math.random()*95+2)+"%";
+    s.style.top=(Math.random()*30+3)+"%";
+    s.style.fontSize=(10+Math.random()*8)+"px";
+    sky.appendChild(s);
+  }
+})();
+drawSky();
+</script>
+</body>
+</html>
